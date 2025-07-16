@@ -96,4 +96,87 @@ router.get('/live', asyncHandler(async (req, res) => {
 // Metrics endpoint
 router.get('/metrics', getMetrics);
 
+/**
+ * @swagger
+ * /health/test-contradiction:
+ *   post:
+ *     summary: Test contradiction detection without auth (development only)
+ *     tags: [Health]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               text:
+ *                 type: string
+ *                 example: "Vi tilbyr et oppgjør på 50 000 kroner. Vi benekter ethvert ansvar for skadene."
+ *     responses:
+ *       200:
+ *         description: Test results
+ */
+router.post('/test-contradiction', asyncHandler(async (req, res) => {
+  if (process.env.NODE_ENV !== 'development') {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  const { text } = req.body;
+  
+  if (!text || text.length < 10) {
+    return res.status(400).json({
+      success: false,
+      error: 'Text is required and must be at least 10 characters'
+    });
+  }
+
+  // Import the contradiction detector
+  const ContradictionDetector = require('../analyzers/contradictionDetector').default;
+  const detector = new ContradictionDetector();
+
+  // Create a mock processed document
+  const processedDocument = {
+    id: `test_${Date.now()}`,
+    originalFile: null,
+    extractedText: text,
+    metadata: {
+      filename: 'test_input',
+      fileSize: text.length,
+      mimeType: 'text/plain',
+      language: 'no'
+    },
+    structure: {
+      sections: [],
+      entities: [],
+      statements: [],
+      metadata: {}
+    },
+    timestamp: new Date(),
+    processingTime: 0
+  };
+
+  try {
+    const startTime = Date.now();
+    const result = await detector.analyze(processedDocument);
+    const processingTime = Date.now() - startTime;
+
+    res.json({
+      success: true,
+      data: {
+        findings: result.findings,
+        confidence: result.confidence,
+        severity: result.severity,
+        recommendations: result.recommendations,
+        processingTime
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: (error as Error).message
+    });
+  }
+}));
+
 export default router;

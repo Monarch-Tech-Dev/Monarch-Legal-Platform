@@ -1,19 +1,16 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
 
 import { useAuth } from '../hooks/useAuth';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { LoginRequest } from '@shared/types/api';
+import { LoginRequest } from '@monarch/shared';
 
 const LoginPage: React.FC = () => {
   const { login, isLoading } = useAuth();
-  const location = useLocation();
   const [showPassword, setShowPassword] = React.useState(false);
-  
-  const from = (location.state as any)?.from?.pathname || '/dashboard';
 
   const {
     register,
@@ -31,7 +28,7 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8" style={{ zoom: 1, transform: 'scale(1)' }}>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -39,12 +36,13 @@ const LoginPage: React.FC = () => {
         className="max-w-md w-full space-y-8"
       >
         <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-primary-100">
+          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-primary-100" style={{ height: '48px', width: '48px' }}>
             <svg
               className="h-8 w-8 text-primary-600"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
+              style={{ height: '32px', width: '32px', maxHeight: '32px', maxWidth: '32px' }}
             >
               <path
                 strokeLinecap="round"

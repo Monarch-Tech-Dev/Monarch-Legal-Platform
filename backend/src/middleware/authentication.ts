@@ -26,6 +26,28 @@ export const authentication = async (
       throw new AuthenticationError('Authentication token required');
     }
     
+    // DEV MODE: Allow test token for development
+    if (process.env.NODE_ENV === 'development' && token === 'dev-token-123') {
+      const testUser: User = {
+        id: 'dev-user-001',
+        email: 'test@monarchlegal.no',
+        name: 'Test User',
+        role: 'user',
+        tier: 'professional',
+        verified: true,
+        createdAt: new Date().toISOString(),
+        lastLogin: new Date().toISOString()
+      };
+      
+      req.user = testUser;
+      logger.info('Development user authenticated', {
+        userId: testUser.id,
+        email: testUser.email
+      });
+      next();
+      return;
+    }
+    
     // Verify JWT token
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {

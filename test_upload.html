@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Document Upload</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .upload-area { border: 2px dashed #ccc; padding: 20px; text-align: center; }
+        .result { margin-top: 20px; padding: 10px; border: 1px solid #ddd; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+    </style>
+</head>
+<body>
+    <h1>Test Document Analysis API</h1>
+    
+    <div class="upload-area">
+        <input type="file" id="fileInput" accept=".pdf,.docx,.txt">
+        <br><br>
+        <button onclick="uploadFile()">Upload and Analyze</button>
+    </div>
+    
+    <div id="result"></div>
+    
+    <script>
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Analyzing document...</p>';
+            
+            try {
+                const formData = new FormData();
+                formData.append('document', file);
+                
+                const response = await fetch('http://localhost:3000/api/analysis/document', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <h3>Analysis Complete!</h3>
+                        <p><strong>Confidence:</strong> ${Math.round(data.data.confidence * 100)}%</p>
+                        <p><strong>Severity:</strong> ${data.data.severity}</p>
+                        <p><strong>Issues Found:</strong> ${data.data.contradictionsFound || data.data.findings?.length || 0}</p>
+                        <p><strong>Processing Time:</strong> ${data.data.processingTime}ms</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    throw new Error(data.error?.message || 'Analysis failed');
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<h3>Error</h3><p>${error.message}</p>`;
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

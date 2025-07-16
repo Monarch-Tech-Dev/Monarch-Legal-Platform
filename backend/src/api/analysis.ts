@@ -7,6 +7,8 @@ import { validateRequest } from '../middleware/validation';
 import DocumentProcessor from '../services/documentProcessor';
 import ContradictionDetector from '../analyzers/contradictionDetector';
 import { logger } from '../utils/logger';
+import { documentStorage } from '../models/Document';
+import { fileStorage } from '../services/fileStorage';
 import { 
   AnalyzeDocumentRequest, 
   AnalyzeDocumentResponse, 
@@ -113,6 +115,13 @@ router.post('/document',
       const moduleResults: ModuleResult[] = [];
       
       if (modules.includes('contradiction')) {
+        // Log extracted text for debugging
+        logger.info('Extracted text for contradiction analysis', {
+          textLength: processedDocument.extractedText.length,
+          textPreview: processedDocument.extractedText.substring(0, 500),
+          documentId: processedDocument.id
+        });
+        
         const contradictionResult = await contradictionDetector.analyze(processedDocument);
         moduleResults.push(contradictionResult);
       }
@@ -150,16 +159,54 @@ router.post('/document',
         requestId: req.headers['x-request-id'] as string
       };
 
+      // Store document permanently
+      const storedFile = await fileStorage.storeFile(req.file, user.id);
+      
+      // Save document to database
+      const documentRecord = await documentStorage.saveDocument({
+        userId: user.id,
+        filename: storedFile.filename,
+        originalName: storedFile.originalName,
+        fileSize: storedFile.fileSize,
+        mimeType: storedFile.mimeType,
+        filePath: storedFile.filePath,
+        extractedText: processedDocument.extractedText,
+        metadata: {
+          language: options.language || 'no',
+          jurisdiction: options.jurisdiction || 'norway',
+          ...processedDocument.metadata
+        },
+        analysisIds: [analysisId],
+        tags: [],
+        isDeleted: false
+      });
+
+      // Save analysis results to database
+      await documentStorage.saveAnalysis({
+        userId: user.id,
+        documentId: documentRecord.id,
+        type: 'document',
+        modules,
+        options,
+        results: {
+          overallScore,
+          severity,
+          findings,
+          recommendations,
+          processingTime
+        },
+        status: 'completed'
+      });
+
       logger.info('Document analysis completed', {
         userId: user.id,
         analysisId,
+        documentId: documentRecord.id,
         findingsCount: findings.length,
         overallScore,
         severity,
         processingTime
       });
-
-      // TODO: Store analysis results in database
 
       res.json(response);
 
@@ -359,23 +406,56 @@ router.get('/:analysisId',
     const { analysisId } = req.params;
     const user = req.user;
 
-    // TODO: Retrieve analysis from database
-    // For now, return a placeholder response
-    
     logger.info('Retrieving analysis', {
       userId: user.id,
       analysisId
     });
 
-    res.status(501).json({
-      success: false,
-      error: {
-        code: 'NOT_IMPLEMENTED',
-        message: 'Analysis retrieval not yet implemented'
+    // Retrieve analysis from storage
+    const analysis = await documentStorage.getAnalysis(analysisId, user.id);
+    
+    if (!analysis) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'ANALYSIS_NOT_FOUND',
+          message: 'Analysis not found or access denied'
+        },
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id']
+      });
+    }
+
+    // Get associated document if it exists
+    let documentInfo: any = null;
+    if (analysis.documentId) {
+      const document = await documentStorage.getDocument(analysis.documentId, user.id);
+      if (document) {
+        documentInfo = {
+          id: document.id,
+          filename: document.originalName,
+          fileSize: document.fileSize,
+          uploadedAt: document.createdAt.toISOString()
+        };
+      }
+    }
+
+    const response: ApiResponse<any> = {
+      success: true,
+      data: {
+        analysisId: analysis.id,
+        overallScore: analysis.results.overallScore,
+        severity: analysis.results.severity,
+        findings: analysis.results.findings,
+        recommendations: analysis.results.recommendations,
+        processingTime: analysis.results.processingTime,
+        documentInfo
       },
       timestamp: new Date().toISOString(),
-      requestId: req.headers['x-request-id']
-    });
+      requestId: req.headers['x-request-id'] as string
+    };
+
+    res.json(response);
   })
 );
 

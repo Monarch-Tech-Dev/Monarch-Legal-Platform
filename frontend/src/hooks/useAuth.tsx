@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useMutation, useQueryClient } from 'react-query';
 import toast from 'react-hot-toast';
-import { User, LoginRequest, RegisterRequest, LoginResponse } from '@shared/types/api';
+import { User, LoginRequest, RegisterRequest, LoginResponse } from '@monarch/shared';
 import * as authApi from '../services/api/auth';
 
 interface AuthContextType {
@@ -24,9 +24,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const queryClient = useQueryClient();
 
-  // Initialize auth state from localStorage
+  // Simplified auth initialization - just check localStorage and complete quickly
   useEffect(() => {
-    const initializeAuth = async () => {
+    console.log('AuthProvider: Starting initialization...');
+    
+    try {
       const token = localStorage.getItem('token');
       const userData = localStorage.getItem('user');
       
@@ -34,25 +36,46 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           const parsedUser = JSON.parse(userData);
           setUser(parsedUser);
-          
-          // Set default authorization header
           authApi.setAuthToken(token);
-          
-          // Validate token by making a test request
-          // This would typically be a call to get current user
-          // For now, we'll assume the token is valid if it exists
+          console.log('AuthProvider: User restored from localStorage:', parsedUser.email);
         } catch (error) {
-          // Invalid data in localStorage
+          console.warn('AuthProvider: Invalid auth data, clearing:', error);
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           localStorage.removeItem('refreshToken');
         }
+      } else {
+        console.log('AuthProvider: No existing auth data found');
+        
+        // DEV MODE: Auto-login with test user for development
+        if (import.meta.env.DEV) {
+          const testUser = {
+            id: 'dev-user-001',
+            email: 'test@monarchlegal.no',
+            name: 'Test User',
+            role: 'user' as const,
+            tier: 'professional' as const,
+            verified: true,
+            createdAt: new Date(),
+            lastLogin: new Date()
+          };
+          
+          const testToken = 'dev-token-123';
+          
+          localStorage.setItem('token', testToken);
+          localStorage.setItem('user', JSON.stringify(testUser));
+          setUser(testUser);
+          authApi.setAuthToken(testToken);
+          
+          console.log('AuthProvider: Auto-logged in test user for development');
+        }
       }
-      
-      setIsLoading(false);
-    };
-
-    initializeAuth();
+    } catch (error) {
+      console.error('AuthProvider: Initialization error:', error);
+    }
+    
+    console.log('AuthProvider: Initialization complete, setting loading to false');
+    setIsLoading(false);
   }, []);
 
   // Login mutation

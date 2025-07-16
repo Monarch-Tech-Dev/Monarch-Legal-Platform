@@ -39,8 +39,7 @@ describe('DocumentProcessor', () => {
         filename: '',
         path: '',
         buffer: Buffer.from('Dette er en test dokument med norsk tekst. Dette dokumentet inneholder motsigelser.'),
-        stream: null as any,
-        mv: null as any
+        stream: null as any
       };
 
       const result = await processor.processDocument(mockFile);
@@ -65,8 +64,7 @@ describe('DocumentProcessor', () => {
         filename: '',
         path: '',
         buffer: Buffer.from('Dette er et norsk dokument med mange norske ord som og, i, til, av, for, med, på, er, som, det, ikke, jeg, vi, du.'),
-        stream: null as any,
-        mv: null as any
+        stream: null as any
       };
 
       const result = await processor.processDocument(mockFile);
@@ -85,8 +83,7 @@ describe('DocumentProcessor', () => {
         filename: '',
         path: '',
         buffer: Buffer.from('Saken 202412345 gjelder NAV og 15. januar 2024. Beløpet er 25 000 kr.'),
-        stream: null as any,
-        mv: null as any
+        stream: null as any
       };
 
       const result = await processor.processDocument(mockFile);
@@ -124,8 +121,7 @@ describe('DocumentProcessor', () => {
         filename: '',
         path: '',
         buffer: Buffer.from(''),
-        stream: null as any,
-        mv: null as any
+        stream: null as any
       };
 
       await expect(processor.processDocument(mockFile)).rejects.toThrow('empty');
@@ -142,8 +138,7 @@ describe('DocumentProcessor', () => {
         filename: '',
         path: '',
         buffer: Buffer.from('test content'),
-        stream: null as any,
-        mv: null as any
+        stream: null as any
       };
 
       await expect(processor.processDocument(mockFile)).rejects.toThrow('Unsupported file type');
@@ -162,8 +157,7 @@ describe('DocumentProcessor', () => {
         filename: '',
         path: '',
         buffer: Buffer.from('Lorem ipsum '.repeat(100) + 'Dette er norsk tekst for testing.'),
-        stream: null as any,
-        mv: null as any
+        stream: null as any
       };
 
       const startTime = Date.now();
@@ -172,7 +166,7 @@ describe('DocumentProcessor', () => {
 
       expect(endTime - startTime).toBeLessThan(5000); // 5 seconds max
       expect(result.processingTime).toBeLessThan(5000);
-      expect(result.processingTime).toBeGreaterThan(0);
+      expect(result.processingTime).toBeGreaterThanOrEqual(0); // Allow 0ms for fast processing
     });
   });
 });

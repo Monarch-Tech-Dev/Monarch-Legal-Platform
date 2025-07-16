@@ -52,7 +52,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           />
         </AuthProvider>
       </BrowserRouter>
-      {process.env.NODE_ENV === 'development' && <ReactQueryDevtools />}
+      {import.meta.env.DEV && <ReactQueryDevtools />}
     </QueryClientProvider>
   </React.StrictMode>
 );

@@ -3,13 +3,9 @@ import { Request, Response } from 'express';
 import Redis from 'ioredis';
 import { logger } from '../utils/logger';
 
-// Redis client for distributed rate limiting
+// Redis client for distributed rate limiting - disabled for now due to timeout issues
 let redis: Redis | null = null;
-try {
-  redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
-} catch (error) {
-  logger.warn('Redis not available for rate limiting, using memory store');
-}
+logger.info('Using memory store for rate limiting in development');
 
 // Custom rate limit store using Redis
 class RedisStore {
@@ -22,17 +18,26 @@ class RedisStore {
   }
 
   async incr(key: string, window: number): Promise<{ totalHits: number; resetTime: number }> {
-    const redisKey = `${this.prefix}${key}`;
-    const multi = this.redis.multi();
-    
-    multi.incr(redisKey);
-    multi.expire(redisKey, Math.ceil(window / 1000));
-    
-    const results = await multi.exec();
-    const totalHits = results?.[0]?.[1] as number || 0;
-    const resetTime = Date.now() + window;
-    
-    return { totalHits, resetTime };
+    try {
+      const redisKey = `${this.prefix}${key}`;
+      const multi = this.redis.multi();
+      
+      multi.incr(redisKey);
+      multi.expire(redisKey, Math.ceil(window / 1000));
+      
+      const results = await Promise.race([
+        multi.exec(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 500))
+      ]) as any;
+      
+      const totalHits = results?.[0]?.[1] as number || 0;
+      const resetTime = Date.now() + window;
+      
+      return { totalHits, resetTime };
+    } catch (error) {
+      logger.warn('Redis incr operation failed, allowing request', { error: (error as Error).message });
+      return { totalHits: 1, resetTime: Date.now() + window };
+    }
   }
 
   async reset(key: string): Promise<void> {

@@ -90,28 +90,52 @@ router.post('/register',
       isActive: true
     };
 
-    // Generate JWT token
+    // Generate JWT tokens
+    const jwtSecret = process.env.JWT_SECRET || 'dev-secret';
+    
     const token = jwt.sign(
-      { userId: user.id, email: user.email, tier: user.tier },
-      process.env.JWT_SECRET || 'dev-secret',
+      { 
+        userId: user.id, 
+        email: user.email, 
+        name: user.name,
+        role: 'user',
+        tier: user.tier,
+        verified: true
+      },
+      jwtSecret,
       { expiresIn: '24h' }
+    );
+
+    const refreshToken = jwt.sign(
+      { userId: user.id },
+      jwtSecret,
+      { expiresIn: '7d' }
     );
 
     logSecurity('User registered', { userId: user.id, email });
 
+    const userResponse: User = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: 'user',
+      tier: user.tier as any,
+      verified: true,
+      createdAt: user.createdAt,
+      lastLogin: new Date().toISOString()
+    };
+
+    const response: LoginResponse = {
+      token,
+      refreshToken,
+      user: userResponse,
+      expiresIn: 24 * 60 * 60 // 24 hours in seconds
+    };
+
     res.status(201).json({
       success: true,
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          tier: user.tier,
-          createdAt: user.createdAt
-        },
-        token,
-        expiresIn: '24h'
-      },
+      data: response,
+      message: 'Registration successful',
       timestamp: new Date().toISOString(),
       requestId: req.headers['x-request-id']
     });
@@ -161,6 +185,9 @@ router.post('/login',
     const { email, password }: LoginRequest = req.body;
 
     logger.info('User login attempt', { email });
+
+    // Add small delay to prevent timing attacks but fix timeout
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // TODO: Fetch user from database
     // For now, simulate database lookup

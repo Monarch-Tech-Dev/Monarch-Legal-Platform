@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 
 import { useAuth } from '../hooks/useAuth';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { RegisterRequest } from '@shared/types/api';
+import { RegisterRequest } from '@monarch/shared';
 
 const RegisterPage: React.FC = () => {
   const { register: registerUser, isLoading } = useAuth();

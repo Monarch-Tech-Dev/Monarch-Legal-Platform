@@ -137,7 +137,7 @@ export class DocumentProcessor {
       const data = await pdfParse(buffer);
       
       if (!data.text || data.text.trim().length === 0) {
-        throw new CustomError('PDF contains no extractable text', 400, 'NO_TEXT_CONTENT');
+        throw new CustomError('PDF contains no extractable text. This appears to be a scanned document - please convert to text-based PDF or use DOCX/TXT format instead.', 400, 'SCANNED_PDF_ERROR');
       }
       
       return this.cleanExtractedText(data.text);

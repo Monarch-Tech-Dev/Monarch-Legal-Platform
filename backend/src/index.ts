@@ -23,6 +23,8 @@ import caseRoutes from './api/cases';
 import userRoutes from './api/users';
 import patternRoutes from './api/patterns';
 import healthRoutes from './api/health';
+import outreachRoutes from './api/outreach';
+import marketplaceRoutes from './api/marketplace';
 
 // Database connections
 import { initializeDatabase } from './database/connection';
@@ -98,6 +100,8 @@ app.use('/api/responses', authentication, responseRoutes);
 app.use('/api/cases', authentication, caseRoutes);
 app.use('/api/users', authentication, userRoutes);
 app.use('/api/patterns', authentication, patternRoutes);
+app.use('/api/outreach', authentication, outreachRoutes);
+app.use('/api/marketplace', marketplaceRoutes);
 
 // Swagger documentation
 if (NODE_ENV === 'development') {

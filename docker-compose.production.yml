@@ -1,0 +1,454 @@
+# Monarch Legal Platform - Production Docker Compose
+# Complete platform deployment with all services
+
+version: '3.8'
+
+networks:
+  monarch_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_data:
+    driver: local
+  neo4j_data:
+    driver: local
+  redis_data:
+    driver: local
+  ai_models:
+    driver: local
+  document_storage:
+    driver: local
+  backup_storage:
+    driver: local
+
+services:
+  # Frontend Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.production
+    container_name: monarch_frontend
+    ports:
+      - "443:443"
+      - "80:80"
+    environment:
+      - REACT_APP_API_URL=https://api.monarch.legal
+      - REACT_APP_ENVIRONMENT=production
+      - REACT_APP_VERSION=${VERSION}
+      - REACT_APP_SENTRY_DSN=${FRONTEND_SENTRY_DSN}
+    volumes:
+      - ./ssl:/etc/ssl/certs:ro
+    depends_on:
+      - backend
+      - ai-engine
+    networks:
+      - monarch_network
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`monarch.legal`)"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+
+  # Backend API Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.production
+    container_name: monarch_backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgresql://monarch_user:${POSTGRES_PASSWORD}@postgres:5432/monarch_legal
+      - REDIS_URL=redis://redis:6379
+      - NEO4J_URL=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - SENTRY_DSN=${BACKEND_SENTRY_DSN}
+      - AI_ENGINE_URL=http://ai-engine:5000
+      - DOCUMENT_STORAGE_PATH=/app/storage/documents
+      - LOVDATA_API_KEY=${LOVDATA_API_KEY}
+      - RETTSDATA_API_KEY=${RETTSDATA_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+    volumes:
+      - document_storage:/app/storage/documents
+      - backup_storage:/app/backups
+    depends_on:
+      - postgres
+      - redis
+      - neo4j
+      - ai-engine
+    networks:
+      - monarch_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`api.monarch.legal`)"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+
+  # AI/ML Engine Service
+  ai-engine:
+    build:
+      context: ./ai-engine
+      dockerfile: Dockerfile.production
+    container_name: monarch_ai_engine
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - MODEL_PATH=/app/models
+      - TORCH_DEVICE=cuda
+      - TRANSFORMERS_CACHE=/app/cache
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ai_models:/app/models
+      - ./ai-engine/cache:/app/cache
+    networks:
+      - monarch_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 120s
+
+  # Mobile API Gateway (for mobile app support)
+  mobile-gateway:
+    build:
+      context: ./mobile-gateway
+      dockerfile: Dockerfile
+    container_name: monarch_mobile_gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - BACKEND_URL=http://backend:3000
+      - AI_ENGINE_URL=http://ai-engine:5000
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      - backend
+      - redis
+    networks:
+      - monarch_network
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: monarch_postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=monarch_legal
+      - POSTGRES_USER=monarch_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+      - ./database/backups:/backups
+    networks:
+      - monarch_network
+    restart: unless-stopped
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U monarch_user -d monarch_legal"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: monarch_redis
+    ports:
+      - "6379:6379"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - monarch_network
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Neo4j Graph Database
+  neo4j:
+    image: neo4j:5.14-community
+    container_name: monarch_neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}
+      - NEO4J_PLUGINS=["apoc", "graph-data-science"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*,gds.*
+      - NEO4J_dbms_memory_heap_initial_size=512m
+      - NEO4J_dbms_memory_heap_max_size=2g
+      - NEO4J_dbms_memory_pagecache_size=1g
+    volumes:
+      - neo4j_data:/data
+      - ./neo4j/plugins:/plugins
+      - ./neo4j/import:/import
+    networks:
+      - monarch_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD}", "RETURN 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Elasticsearch for document search
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: monarch_elasticsearch
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    volumes:
+      - ./elasticsearch/data:/usr/share/elasticsearch/data
+      - ./elasticsearch/config:/usr/share/elasticsearch/config:ro
+    networks:
+      - monarch_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Kibana for analytics
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: monarch_kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD}
+    depends_on:
+      - elasticsearch
+    networks:
+      - monarch_network
+    restart: unless-stopped
+
+  # Message Queue (RabbitMQ)
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: monarch_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=monarch
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+    volumes:
+      - ./rabbitmq/data:/var/lib/rabbitmq
+      - ./rabbitmq/config:/etc/rabbitmq
+    networks:
+      - monarch_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: monarch_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    networks:
+      - monarch_network
+    restart: unless-stopped
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: monarch_grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - ./monitoring/grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - monarch_network
+    restart: unless-stopped
+
+  # Load Balancer / Reverse Proxy
+  traefik:
+    image: traefik:v3.0
+    container_name: monarch_traefik
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    environment:
+      - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL=${ACME_EMAIL}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - ./traefik/acme:/acme
+    networks:
+      - monarch_network
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.monarch.legal`)"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
+
+  # Backup Service
+  backup:
+    build:
+      context: ./backup
+      dockerfile: Dockerfile
+    container_name: monarch_backup
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=monarch_legal
+      - POSTGRES_USER=monarch_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - NEO4J_HOST=neo4j
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      - BACKUP_SCHEDULE=0 2 * * *
+      - S3_BUCKET=${BACKUP_S3_BUCKET}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - backup_storage:/backups
+      - document_storage:/data/documents:ro
+    depends_on:
+      - postgres
+      - neo4j
+    networks:
+      - monarch_network
+    restart: unless-stopped
+
+  # Log Aggregation
+  loki:
+    image: grafana/loki:latest
+    container_name: monarch_loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/config.yml:/etc/loki/local-config.yaml:ro
+      - ./loki/data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - monarch_network
+    restart: unless-stopped
+
+  # Log Shipping
+  promtail:
+    image: grafana/promtail:latest
+    container_name: monarch_promtail
+    volumes:
+      - ./promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - monarch_network
+    restart: unless-stopped
+
+  # Security Scanner
+  security-scanner:
+    build:
+      context: ./security
+      dockerfile: Dockerfile
+    container_name: monarch_security_scanner
+    environment:
+      - SCAN_INTERVAL=3600
+      - ALERT_WEBHOOK=${SECURITY_ALERT_WEBHOOK}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./security/rules:/app/rules:ro
+    networks:
+      - monarch_network
+    restart: unless-stopped
+
+  # Certificate Management
+  cert-manager:
+    image: certmanager/cert-manager-controller:latest
+    container_name: monarch_cert_manager
+    environment:
+      - ACME_EMAIL=${ACME_EMAIL}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+    volumes:
+      - ./ssl:/ssl
+      - ./cert-manager/config:/config:ro
+    networks:
+      - monarch_network
+    restart: unless-stopped

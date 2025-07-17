@@ -30,7 +30,7 @@ export const authentication = async (
     if (process.env.NODE_ENV === 'development' && token === 'dev-token-123') {
       const testUser: User = {
         id: 'dev-user-001',
-        email: 'test@monarchlegal.no',
+        email: 'demo@example.com',
         name: 'Test User',
         role: 'user',
         tier: 'professional',

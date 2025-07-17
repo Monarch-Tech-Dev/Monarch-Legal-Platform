@@ -51,7 +51,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (import.meta.env.DEV) {
           const testUser = {
             id: 'dev-user-001',
-            email: 'test@monarchlegal.no',
+            email: 'demo@example.com',
             name: 'Test User',
             role: 'user' as const,
             tier: 'professional' as const,

@@ -56,7 +56,7 @@ export class ContradictionDetector {
       const contradictionTypes = contradictions.map(c => c.type);
       const [legalProvisions, precedents] = await Promise.all([
         legalDatabaseService.findRelevantLaws(contradictionTypes),
-        legalDatabaseService.findSimilarPrecedents(contradictionTypes, 'DNB') // TODO: Extract institution
+        legalDatabaseService.findSimilarPrecedents(contradictionTypes, 'Nordic Insurance') // TODO: Extract institution
       ]);
       
       // Convert to findings with legal backing

@@ -79,8 +79,8 @@ export class TemplateService {
 
   private static getPlaceholderValue(variableName: string): string {
     const placeholders: Record<string, string> = {
-      'INSTITUTION_NAME': 'DNB Livsforsikring AS',
-      'CASE_NUMBER': '202504176',
+      'INSTITUTION_NAME': 'Nordic Insurance Group',
+      'CASE_NUMBER': '20240001',
       'DATE': new Date().toLocaleDateString('no-NO'),
       'SENDER_NAME': '[Your Name]',
       'CONTRADICTIONS': '1. "Ingen fysisk hendelse fant sted"\n2. "Sammenstøtet resulterte i skade"',

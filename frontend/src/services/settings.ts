@@ -15,7 +15,7 @@ import {
 const mockUserProfile: UserProfile = {
   id: 'user_001',
   name: 'Test User',
-  email: 'test@monarchlegal.no',
+  email: 'demo@example.com',
   role: 'user',
   tier: 'free',
   joinedAt: new Date('2024-01-01'),

@@ -330,7 +330,7 @@ export class LegalDatabaseService {
         outcome: 'settled',
         settlementAmount: 75000,
         timeToResolution: 120,
-        opposingParty: 'DNB',
+        opposingParty: 'Nordic Insurance',
         legalStrategy: ['factual_contradiction_challenge'],
         successFactors: ['Medical documentation', 'Witness statements'],
         confidenceAtStart: 0.92,

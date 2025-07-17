@@ -1,0 +1,41 @@
+GNU AFFERO GENERAL PUBLIC LICENSE
+Version 3, 19 November 2007
+
+Copyright (C) 2025 Monarch Legal Platform
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+OPEN CORE MODEL NOTICE:
+This project follows an open core model under AGPL-3. The core functionality
+is open source, but premium features, enterprise capabilities, and business
+model components are proprietary and not included in this repository.
+
+For commercial licensing, enterprise features, or premium support, please
+contact: licensing@monarchlegal.com
+
+THIRD-PARTY LICENSES:
+This software may include third-party libraries with their own licenses.
+See individual files and package.json for details.
+
+NETWORK COPYLEFT:
+As required by AGPL-3, if you modify this software and offer it as a
+network service, you must provide the complete source code of your
+modifications to users of that service.
+
+CONTRIBUTION AGREEMENT:
+By contributing to this project, you agree to license your contributions
+under the same AGPL-3 terms.
+
+Contact: legal@monarchlegal.com
+Website: https://monarchlegal.com

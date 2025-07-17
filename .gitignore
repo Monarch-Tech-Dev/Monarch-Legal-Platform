@@ -4,12 +4,23 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Environment variables
+# Environment variables & Security
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+*.key
+*.pem
+**/secrets/
+**/private-keys/
+config/secrets.json
+auth-config/
+jwt-secrets/
+oauth-keys/
+certificate-authority/
+ssl-certificates/
+security-configs/
 
 # Build outputs
 dist/
@@ -120,3 +131,48 @@ demo_test.js
 # Backup files
 *.bak
 *.backup
+
+# AGPL-3 OPEN CORE MODEL - PREMIUM FEATURES (KEEP PRIVATE)
+backend/src/premium/
+frontend/src/premium/
+ai-engine/src/premium/
+premium-features/
+enterprise/
+business-model/
+pricing/
+revenue/
+subscription/
+licensing/
+premium-api/
+
+# Business Intelligence (Private)
+analytics/
+metrics/
+user-data/
+business-intelligence/
+market-research/
+competitive-analysis/
+financial-projections/
+investor-materials/
+
+# Production & Infrastructure (Private)
+database-backups/
+production-configs/
+deployment-keys/
+infrastructure/
+terraform/
+kubernetes-secrets/
+docker-secrets/
+
+# User Data & Privacy (Private)
+user-uploads/
+personal-data/
+gdpr-data/
+backup-data/
+logs/production/
+crash-reports/production/
+
+# Machine Learning Models (if proprietary)
+ai-engine/models/proprietary/
+ai-engine/training-data/proprietary/
+ml-models/premium/
